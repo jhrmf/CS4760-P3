@@ -2,9 +2,9 @@
 
 struct myTime updateClock(struct myTime virtual){
     virtual.nanoseconds = virtual.nanoseconds + 40000;
-    if(virtual.nanoseconds == 1000000000){
+    if(virtual.nanoseconds >= 1000000000){
         virtual.seconds++;
-        virtual.nanoseconds = 0;
+        virtual.nanoseconds = virtual.nanoseconds - 1000000000;
     }
     return virtual;
 }
@@ -70,8 +70,8 @@ int main(int argc, char *argv[]) {
     setupinterrupt();                                                    //start the interrupt and timer for the program
     setupitimer(timeInSec);
 
-    key_t secKey = ftok("testing2", 66);
-    key_t nanoKey = ftok("testing3", 67);
+    key_t secKey = 66;
+    key_t nanoKey = 67;
 
     int secID = shmget(secKey, 1024, 0666|IPC_CREAT); //this
     int nanoID = shmget(nanoKey, 1024, 0666|IPC_CREAT);
@@ -79,16 +79,19 @@ int main(int argc, char *argv[]) {
 
     do{
         virtual = updateClock(virtual);
-        char temp1[] = "", temp2[] = "";
+        printf("%d seconds and %d nanoseconds\n", virtual.seconds, virtual.nanoseconds);
+        char temp1[10], temp2[11];
         sprintf(temp1, "%d", virtual.seconds);
         sprintf(temp2, "%d", virtual.nanoseconds);
         char *secStr = (char*) shmat(secID, (void*)0, 0);
-        char *nanoStr = (char*) shmat(nanoID, (void*)0, 0);
-        secStr = temp1;
-        nanoStr = temp2;
+        strcpy(secStr,temp1);   //ISSUE
         shmdt(secStr);
+        char *nanoStr = (char*) shmat(nanoID, (void*)0, 0);
+        strcpy(nanoStr, temp2);  //ISSUE
         shmdt(nanoStr);
-        execv("./shmMsg", NULL);
-    }while(virtual.seconds != 2);
+        execl("./shmMsg", NULL);
 
+    }while(virtual.seconds < 2);
+    shmctl(secID, IPC_RMID, NULL);
+    shmctl(nanoID, IPC_RMID, NULL);
 }
