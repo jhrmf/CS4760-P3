@@ -32,7 +32,7 @@ static int setupitimer(int n) {                                             /* s
 int main(int argc, char *argv[]) {
 
     int opt = 0;
-    int timeInSec = 2;
+    int timeInSec = 1;
     int maxChildren = 5;
     int x = 0;
     char fileName[100];
@@ -75,31 +75,43 @@ int main(int argc, char *argv[]) {
 
     int secID = shmget(secKey, 1024, 0666|IPC_CREAT); //this
     int nanoID = shmget(nanoKey, 1024, 0666|IPC_CREAT);
-    int childCount;
+    int childCount, notDone = 0, gonnaDie = 0;
     pid_t childPid;
     for(childCount = 0; childCount < maxChildren; childCount++){
-        childPid = fork();
-    }
-    if(childPid == 0){
-        execl("./shmMsg", NULL);
-        exit(0);
-    }else{
-        do{
-            virtual = updateClock(virtual);
-            char temp1[10], temp2[11];
-            sprintf(temp1, "%d", virtual.seconds);
-            sprintf(temp2, "%d", virtual.nanoseconds);
-            char *secStr = (char*) shmat(secID, (void*)0, 0);
-            strcpy(secStr,temp1);   //ISSUE
-            shmdt(secStr);
-            char *nanoStr = (char*) shmat(nanoID, (void*)0, 0);
-            strcpy(nanoStr, temp2);  //ISSUE
-            shmdt(nanoStr);
+        if(childPid != 0){
+            childPid = fork();
+        }
 
-        }while(virtual.seconds <= 2);
-        shmctl(secID, IPC_RMID, NULL);
-        shmctl(nanoID, IPC_RMID, NULL);
     }
+    do{
+        if(childCount != maxChildren-1){
+            for(childCount; childCount < maxChildren; childCount++) {
+                childPid = fork();
+                printf("NEW CHILD\n");
+            }
+        }
+        if(childPid == 0){
+            childCount--;
+            execl("./shmMsg", NULL);
+
+        }else{
+            do{
+                virtual = updateClock(virtual);
+                char temp1[10], temp2[11];
+                sprintf(temp1, "%d", virtual.seconds);
+                sprintf(temp2, "%d", virtual.nanoseconds);
+                char *secStr = (char *) shmat(secID, (void *) 0, 0);
+                strcpy(secStr, temp1);   //ISSUE
+                shmdt(secStr);
+                char *nanoStr = (char *) shmat(nanoID, (void *) 0, 0);
+                strcpy(nanoStr, temp2);  //ISSUE
+                shmdt(nanoStr);
+            } while (virtual.seconds <= 2);
+         shmctl(secID, IPC_RMID, NULL);
+         shmctl(nanoID, IPC_RMID, NULL);
+         break;
+        }
+    }while(1);
     exit(0);
 
 }

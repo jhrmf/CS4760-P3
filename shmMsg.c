@@ -45,13 +45,11 @@ void* thread(void* arg){
             break;
         }
         if (memString != NULL) {
-            printf("HERE IN NOT NULL\n");
             hasMessage = 1;
         } else if (memString == NULL && (seconds + nano) >= time) {
             key_t key = 65;
             int shmid = shmget(key, 1024, 0666 | IPC_CREAT);
             char *str = (char *) shmat(shmid, (void *) 0, 0);
-            printf("HERE IN MEMSTRING\n");
             float tempTime = seconds + nano;
             char timeStr[10];
             sprintf(timeStr, "%f", tempTime);
@@ -59,18 +57,17 @@ void* thread(void* arg){
             memString = "BLAH";
             shmdt(str);
         } else if ((seconds + nano) <= time) {
-        //    printf("%d and %f is <= %f\n", seconds, nano, time);
+           // printf("%d and %f is <= %f\n", seconds, nano, time);
         }
         sem_post(&mutex);
     }while(1);
-
 }
 
 main(){
-
     sem_init(&mutex, 0, 1);
     pthread_t t;
     pthread_create(&t, NULL, thread, NULL);
     pthread_join(t, NULL);
     sem_destroy(&mutex);
+    exit(0);
 }
