@@ -1,7 +1,7 @@
 #include "sharedMem.h"
 
 sem_t mutex;
-char *memString;
+char *memString = NULL;
 
 float randomAdd(int seconds, float nano){
     int num = (rand() % (1000000 - 1 + 1)) + 1;
@@ -11,71 +11,62 @@ float randomAdd(int seconds, float nano){
 
 int getSeconds(){
     key_t key = 66;
-    int secID = shmget(key, 1024, 0666|IPC_CREAT);
+    int secID = shmget(key, 1024, 0444);
     char *tempTime = (char*) shmat(secID, (void*)0, 0);
     int seconds = atoi(tempTime);
-    printf("%d seconds\n", seconds);
     shmdt(tempTime);
     return seconds;
 }
 float getNano(){
     key_t key = 67;
-    int nanoID = shmget(key, 1024, 0666|IPC_CREAT);
+    int nanoID = shmget(key, 1024, 0444);
     char *tempTime = (char*) shmat(nanoID, (void*)0, 0);
-    printf("%s nano\n", tempTime);
     float nano = (float)(atoi(tempTime)) / 1000000000;
     shmdt(tempTime);
     return nano;
 }
 
 void* thread(void* arg){
-    int check = 0, hasMessage = 0, seconds = getSeconds();
+    int hasMessage = 0, seconds = getSeconds();
     float nano = getNano(), time = randomAdd(seconds, nano);
-    key_t key = ftok("shmfile",64);
-    int shmid = shmget(key, 1024, 0444|IPC_CREAT);
-    char *str = (char*) shmat(shmid,(void*)0,0);
-    if(sizeof(str) > 0){
-        if(str == "yes"){
-            hasMessage = 1;
+    do {
+        seconds = getSeconds();
+        nano = getNano();
+        sem_wait(&mutex);
+        if (hasMessage == 1) {
+            hasMessage = 0;
+            key_t key = 65;
+            int shmid = shmget(key, 1024, 0444);
+            char *str = (char *) shmat(shmid, (void *) 0, 0);
+            printf("Message: %s\n", str);
+            shmdt(str);
+            shmctl(shmid, IPC_RMID, NULL);
+            memString = NULL;
+            break;
         }
-    }
-    shmdt(str);
-    shmctl(shmid, IPC_RMID, NULL);
-
-    sem_wait(&mutex);
-    if(hasMessage == 1){
-        key_t key = ftok("shmfile",65);
-        int shmid = shmget(key, 1024, 0444|IPC_CREAT);
-        char *str = (char*) shmat(shmid,(void*)0,0);
-        printf("Message: %s\n", str);
-        shmdt(str);
-        shmctl(shmid, IPC_RMID, NULL);
-    }
-    if(memString != NULL){
+        if (memString != NULL) {
             printf("HERE IN NOT NULL\n");
-            key_t checkKey = ftok("key", 64);
-            int checkID = shmget(checkKey, 1024, 0666|IPC_CREAT);
-            char *str = (char*) shmat(checkID, (void*)0, 0);
-            strcpy(str, "yes");
-            shmdt(str);
-    }
-    else if(memString == NULL && (seconds + nano) >= time ){
-            key_t key = ftok("testing", 65);
-            int shmid = shmget(key, 1024, 0666|IPC_CREAT);
-            char *str = (char*) shmat(shmid,(void*)0,0);
+            hasMessage = 1;
+        } else if (memString == NULL && (seconds + nano) >= time) {
+            key_t key = 65;
+            int shmid = shmget(key, 1024, 0666 | IPC_CREAT);
+            char *str = (char *) shmat(shmid, (void *) 0, 0);
             printf("HERE IN MEMSTRING\n");
-            strcpy(str, "TERMINATED\n");
+            float tempTime = seconds + nano;
+            char timeStr[10];
+            sprintf(timeStr, "%f", tempTime);
+            strcpy(str, timeStr);
+            memString = "BLAH";
             shmdt(str);
-    }
-    else if((seconds + nano) <= time){
-            printf("%d and %f is <= %f\n", seconds, nano, time);
-    }
-    sem_post(&mutex);
+        } else if ((seconds + nano) <= time) {
+        //    printf("%d and %f is <= %f\n", seconds, nano, time);
+        }
+        sem_post(&mutex);
+    }while(1);
+
 }
 
 main(){
-
-    printf("Hello World!\n");
 
     sem_init(&mutex, 0, 1);
     pthread_t t;

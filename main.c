@@ -75,23 +75,31 @@ int main(int argc, char *argv[]) {
 
     int secID = shmget(secKey, 1024, 0666|IPC_CREAT); //this
     int nanoID = shmget(nanoKey, 1024, 0666|IPC_CREAT);
-
-
-    do{
-        virtual = updateClock(virtual);
-        printf("%d seconds and %d nanoseconds\n", virtual.seconds, virtual.nanoseconds);
-        char temp1[10], temp2[11];
-        sprintf(temp1, "%d", virtual.seconds);
-        sprintf(temp2, "%d", virtual.nanoseconds);
-        char *secStr = (char*) shmat(secID, (void*)0, 0);
-        strcpy(secStr,temp1);   //ISSUE
-        shmdt(secStr);
-        char *nanoStr = (char*) shmat(nanoID, (void*)0, 0);
-        strcpy(nanoStr, temp2);  //ISSUE
-        shmdt(nanoStr);
+    int childCount;
+    pid_t childPid;
+    for(childCount = 0; childCount < maxChildren; childCount++){
+        childPid = fork();
+    }
+    if(childPid == 0){
         execl("./shmMsg", NULL);
+        exit(0);
+    }else{
+        do{
+            virtual = updateClock(virtual);
+            char temp1[10], temp2[11];
+            sprintf(temp1, "%d", virtual.seconds);
+            sprintf(temp2, "%d", virtual.nanoseconds);
+            char *secStr = (char*) shmat(secID, (void*)0, 0);
+            strcpy(secStr,temp1);   //ISSUE
+            shmdt(secStr);
+            char *nanoStr = (char*) shmat(nanoID, (void*)0, 0);
+            strcpy(nanoStr, temp2);  //ISSUE
+            shmdt(nanoStr);
 
-    }while(virtual.seconds < 2);
-    shmctl(secID, IPC_RMID, NULL);
-    shmctl(nanoID, IPC_RMID, NULL);
+        }while(virtual.seconds <= 2);
+        shmctl(secID, IPC_RMID, NULL);
+        shmctl(nanoID, IPC_RMID, NULL);
+    }
+    exit(0);
+
 }
