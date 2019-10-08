@@ -20,11 +20,13 @@
 #include <semaphore.h>
 #include <pthread.h>
 
-struct myTime{
+/*holy cow look at all these headers!*/
+
+struct myTime{                                                                             //struct for our virtual time
     int seconds;
     int nanoseconds;
 };
 
-struct myTime virtual;
+struct myTime virtual;                                                             //struct for holding the virtual time
 
 #endif
